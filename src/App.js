@@ -10,6 +10,7 @@ const App = () => {
 
   useEffect(() => {
     const unsubscribe = itemsRef
+      .orderBy("checked", "asc")
       .orderBy("createdAt", "desc")
       .onSnapshot((snapshot) => {
         const fbItems = snapshot.docs.map((doc) => ({

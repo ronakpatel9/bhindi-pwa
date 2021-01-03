@@ -1,25 +1,67 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import { FormControl, Input, Button, List } from "@material-ui/core";
+import Item from "./Item";
+import { itemsRef } from "./firebaseConfig";
+import firebase from "firebase";
 
-function App() {
+const App = () => {
+  const [items, setItems] = useState([]);
+  const [input, setInput] = useState("");
+
+  useEffect(() => {
+    const unsubscribe = itemsRef
+      .orderBy("createdAt", "desc")
+      .onSnapshot((snapshot) => {
+        const fbItems = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setItems(fbItems);
+      });
+    return () => {
+      // cleanup;
+      unsubscribe();
+    };
+  }, []);
+
+  const addItem = (event) => {
+    event.preventDefault();
+    const { serverTimestamp } = firebase.firestore.FieldValue;
+    itemsRef.add({
+      item: input,
+      checked: false,
+      createdAt: serverTimestamp(),
+    });
+    setInput("");
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+    <div>
+      <h1>Bhindi</h1>
+      <form autoComplete="off">
+        <FormControl>
+          <Input
+            placeholder="Enter an item..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+          ></Input>
+        </FormControl>
+        <Button
+          variant="outlined"
+          type="submit"
+          onClick={addItem}
+          disabled={!input}
         >
-          Learn React
-        </a>
-      </header>
+          Add Item
+        </Button>
+      </form>
+      <List>
+        {items.map((item) => (
+          <Item item={item} key={item.id} />
+        ))}
+      </List>
     </div>
   );
-}
+};
 
 export default App;

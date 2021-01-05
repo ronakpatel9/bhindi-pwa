@@ -11,7 +11,27 @@ const firebaseApp = firebase.initializeApp({
 });
 
 const fs = firebaseApp.firestore();
-
 const itemsRef = fs.collection("items");
 
-export { fs, itemsRef };
+const auth = firebase.auth();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+const signInWithGoogle = async () => {
+  try {
+    const res = await auth.signInWithPopup(googleProvider);
+    console.log(res.user);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const signOut = async () => {
+  try {
+    const res = await auth.signOut();
+    console.log(res);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export { fs, itemsRef, auth, signInWithGoogle, signOut };

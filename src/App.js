@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import {
   List,
@@ -46,8 +46,54 @@ const App = () => {
         <h1>Bhindi</h1>
         <SignOut />
       </header>
-      <section>{user ? <ListPage /> : <SignIn />}</section>
+      <section>
+        {user ? (
+          <>
+            <RoomPage />
+          </>
+        ) : (
+          <SignIn />
+        )}
+      </section>
     </div>
+  );
+};
+
+const RoomPage = () => {
+  const [roomSelect, setRoomSelect] = useState("");
+  const { uid } = auth.currentUser;
+
+  const roomsRef = firestore.collection("rooms");
+
+  const query = roomsRef.where("members", "array-contains", uid);
+  const [rooms, loading] = useCollectionData(query, { idField: "id" });
+
+  const handleChange = (e) => {
+    setRoomSelect(e.target.value);
+  };
+
+  useEffect(() => {
+    console.log(roomSelect);
+  }, [roomSelect]);
+
+  return (
+    <>
+      {loading ? (
+        "Loading..."
+      ) : (
+        <select onChange={handleChange}>
+          <option disabled selected value>
+            Select an option
+          </option>
+          {rooms.map((room) => (
+            <option value={room.id} key={room.id}>
+              {room.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {roomSelect ? <ListPage /> : null}
+    </>
   );
 };
 
@@ -116,8 +162,8 @@ const Item = (props) => {
     itemsRef.doc(id).delete();
   };
 
-  const handleChange = (event) => {
-    itemsRef.doc(id).set({ checked: event.target.checked }, { merge: true });
+  const handleChange = (e) => {
+    itemsRef.doc(id).set({ checked: e.target.checked }, { merge: true });
   };
 
   return (

@@ -50,10 +50,44 @@ const App = () => {
         <h1>Bhindi</h1>
         {loading && "Loading..."}
         {user ? <SignOut /> : <SignIn />}
-        {user && <InviteForm />}
+        {user && (
+          <>
+            <InviteForm /> <AddRoomForm />
+          </>
+        )}
       </header>
       <section>{user && <RoomPage />}</section>
     </div>
+  );
+};
+
+const AddRoomForm = () => {
+  const [formValue, setFormValue] = useState("");
+  const roomsRef = firestore.collection("rooms");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const { uid } = auth.currentUser;
+    console.log("Submit");
+    await roomsRef.add({
+      name: formValue,
+      members: [uid],
+      owner: uid,
+    });
+    setFormValue("");
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        value={formValue}
+        onChange={(e) => setFormValue(e.target.value)}
+        placeholder="Enter room name..."
+      />
+      <button type="submit" disabled={!formValue}>
+        Create room
+      </button>
+    </form>
   );
 };
 
@@ -159,7 +193,7 @@ const ListPage = ({ roomId }) => {
 
   const [formValue, setFormValue] = useState("");
 
-  const addItem = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     await itemsRef.add({
@@ -176,7 +210,7 @@ const ListPage = ({ roomId }) => {
   return (
     <>
       <h4>Current room id: {roomId}</h4>
-      <form onSubmit={addItem}>
+      <form onSubmit={handleSubmit}>
         <input
           value={formValue}
           onChange={(e) => setFormValue(e.target.value)}

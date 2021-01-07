@@ -37,6 +37,20 @@ const auth = firebase.auth();
 const firestore = firebase.firestore();
 const analytics = firebase.analytics();
 
+firestore.enablePersistence().catch((err) => {
+  if (err.code === "failed-precondition") {
+    // Multiple tabs open, persistence can only be enabled
+    // in one tab at a a time.
+    // ...
+    console.error("failed due to multi tab");
+  } else if (err.code === "unimplemented") {
+    // The current browser does not support all of the
+    // features required to enable persistence
+    // ...
+    console.error("failed not implemented");
+  }
+});
+
 const App = () => {
   const [user, loading] = useAuthState(auth);
 
@@ -52,7 +66,7 @@ const App = () => {
         {user ? <SignOut /> : <SignIn />}
         {user && (
           <>
-            <InviteForm /> <AddRoomForm />
+            <InviteForm /> <CreateRoomForm />
           </>
         )}
       </header>
@@ -61,20 +75,22 @@ const App = () => {
   );
 };
 
-const AddRoomForm = () => {
+const CreateRoomForm = () => {
   const [formValue, setFormValue] = useState("");
   const roomsRef = firestore.collection("rooms");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { uid } = auth.currentUser;
-    console.log("Submit");
-    await roomsRef.add({
+    const room = await roomsRef.add({
       name: formValue,
       members: [uid],
       owner: uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     setFormValue("");
+    if (room) alert("Room created!");
   };
 
   return (
@@ -126,7 +142,7 @@ const InviteForm = () => {
         <input
           value={formValue}
           onChange={(e) => setFormValue(e.target.value)}
-          placeholder="Enter an chat id..."
+          placeholder="Enter the chat id..."
         />
         <button type="submit" disabled={!formValue}>
           Add room

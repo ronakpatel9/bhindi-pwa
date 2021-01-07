@@ -19,6 +19,7 @@ import "firebase/analytics";
 import { useAuthState } from "react-firebase-hooks/auth";
 import {
   useCollectionData,
+  useDocumentData,
   useDocumentOnce,
 } from "react-firebase-hooks/firestore";
 
@@ -37,25 +38,70 @@ const firestore = firebase.firestore();
 const analytics = firebase.analytics();
 
 const App = () => {
-  const [user] = useAuthState(auth);
+  const [user, loading] = useAuthState(auth);
 
-  console.log(user);
+  if (user) {
+    analytics.logEvent("login", { method: "Google" });
+  }
+
   return (
     <div>
       <header>
         <h1>Bhindi</h1>
-        <SignOut />
+        {loading && "Loading..."}
+        {user ? <SignOut /> : <SignIn />}
+        {user && <InviteForm />}
       </header>
-      <section>
-        {user ? (
-          <>
-            <RoomPage />
-          </>
-        ) : (
-          <SignIn />
-        )}
-      </section>
+      <section>{user && <RoomPage />}</section>
     </div>
+  );
+};
+
+const InviteFormMessage = ({ roomsRef, roomId }) => {
+  const [roomDoc, loading] = useDocumentData(roomsRef.doc(roomId));
+
+  const { uid } = auth.currentUser;
+
+  if (roomDoc && uid) {
+    roomsRef.doc(roomId).update({
+      members: firebase.firestore.FieldValue.arrayUnion(uid),
+    });
+  }
+
+  return loading
+    ? "Loading room..."
+    : roomDoc
+    ? `Room ${roomDoc.name} added please select the room from dropdown below`
+    : "No room found";
+};
+
+const InviteForm = () => {
+  const [formValue, setFormValue] = useState("");
+  const [addRoomId, setAddRoomId] = useState(false);
+  const roomsRef = firestore.collection("rooms");
+
+  const addRoom = async (e) => {
+    e.preventDefault();
+    setAddRoomId(true);
+  };
+
+  return (
+    <>
+      <h3>Invite Form</h3>
+      <form onSubmit={addRoom}>
+        <input
+          value={formValue}
+          onChange={(e) => setFormValue(e.target.value)}
+          placeholder="Enter an chat id..."
+        />
+        <button type="submit" disabled={!formValue}>
+          Add room
+        </button>
+      </form>
+      {addRoomId && formValue && (
+        <InviteFormMessage roomsRef={roomsRef} roomId={formValue} />
+      )}
+    </>
   );
 };
 
@@ -72,17 +118,13 @@ const RoomPage = () => {
     setRoomSelect(e.target.value);
   };
 
-  useEffect(() => {
-    console.log(roomSelect);
-  }, [roomSelect]);
-
   return (
     <>
       {loading ? (
         "Loading..."
       ) : (
-        <select onChange={handleChange}>
-          <option disabled selected value>
+        <select defaultValue="" onChange={handleChange}>
+          <option disabled value="">
             Select an option
           </option>
           {rooms.map((room) => (
@@ -92,15 +134,15 @@ const RoomPage = () => {
           ))}
         </select>
       )}
-      {roomSelect ? <ListPage /> : null}
+      {roomSelect && <ListPage roomId={roomSelect} />}
     </>
   );
 };
 
-const ListPage = () => {
-  const itemsRef = firestore.collection("items");
+const ListPage = ({ roomId }) => {
+  const itemsRef = firestore.doc(`rooms/${roomId}`).collection("items");
   const query = itemsRef.orderBy("checked", "asc").orderBy("createdAt", "desc");
-  const [items] = useCollectionData(query, { idField: "id" });
+  const [items, loading] = useCollectionData(query, { idField: "id" });
 
   const { uid, displayName, email, photoURL } = auth.currentUser;
 
@@ -124,6 +166,7 @@ const ListPage = () => {
       item: formValue,
       checked: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       uid,
       displayName,
     });
@@ -132,6 +175,7 @@ const ListPage = () => {
   };
   return (
     <>
+      <h4>Current room id: {roomId}</h4>
       <form onSubmit={addItem}>
         <input
           value={formValue}
@@ -142,12 +186,16 @@ const ListPage = () => {
           Add item
         </button>
       </form>
-      <List>
-        {items &&
-          items.map((item) => (
-            <Item itemsRef={itemsRef} item={item} key={item.id} />
-          ))}
-      </List>
+      {loading ? (
+        "Loading..."
+      ) : (
+        <List>
+          {items &&
+            items.map((item) => (
+              <Item itemsRef={itemsRef} item={item} key={item.id} />
+            ))}
+        </List>
+      )}
     </>
   );
 };
@@ -163,7 +211,13 @@ const Item = (props) => {
   };
 
   const handleChange = (e) => {
-    itemsRef.doc(id).set({ checked: e.target.checked }, { merge: true });
+    itemsRef.doc(id).set(
+      {
+        checked: e.target.checked,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
   };
 
   return (
@@ -206,9 +260,6 @@ const SignIn = () => {
   return (
     <>
       <button onClick={signInWithGoogle}>Sign in with Google</button>
-      <p>
-        Do not violate the community guidelines or you will be banned for life!
-      </p>
     </>
   );
 };

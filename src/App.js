@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-
 import {
   List,
   ListItem,
@@ -20,8 +19,10 @@ import {
   Input,
   Paper,
   MenuItem,
+  Divider,
+  Tooltip,
 } from "@material-ui/core";
-import { Delete } from "@material-ui/icons";
+import { Delete, ExitToApp, FileCopy } from "@material-ui/icons";
 
 import firebase from "firebase/app";
 import "firebase/firestore";
@@ -34,6 +35,8 @@ import {
   useDocumentData,
   useDocumentOnce,
 } from "react-firebase-hooks/firestore";
+
+import { useSnackbar } from "notistack";
 
 firebase.initializeApp({
   apiKey: "AIzaSyAaxBxClGHAVHAMZXzZFwR10QLuVubesVU",
@@ -64,7 +67,7 @@ firestore.enablePersistence().catch((err) => {
 });
 
 const useStyles = makeStyles((theme) => ({
-  root: {},
+  root: { margin: "5px" },
   loginButton: {
     marginRight: theme.spacing(2),
   },
@@ -80,6 +83,8 @@ const App = () => {
   const classes = useStyles();
   const [user, loading] = useAuthState(auth);
 
+  const [roomSelect, setRoomSelect] = useState("");
+
   if (user) {
     analytics.logEvent("login", { method: "Google" });
   }
@@ -89,16 +94,23 @@ const App = () => {
       {loading ? (
         <Grid container justify="center" alignItems="center" direction="column">
           <Grid item>
-            <CircularProgress />
+            <CircularProgress color="secondary" />
           </Grid>
         </Grid>
       ) : (
         <>
-          <AppBar position="static">
+          <AppBar position="static" color="secondary">
             <Toolbar>
               <Typography variant="h5" className={classes.title}>
                 Bhindi
               </Typography>
+              {user && (
+                <SelectRoom
+                  roomSelect={roomSelect}
+                  setRoomSelect={setRoomSelect}
+                />
+              )}
+              {user && <CopyToClipBoard roomSelect={roomSelect} />}
               {user ? <SignOut /> : <SignIn />}
             </Toolbar>
           </AppBar>
@@ -111,7 +123,7 @@ const App = () => {
                 <CreateRoomForm />
               </Grid>
               <Grid item xs={12}>
-                {user && <RoomPage />}
+                {user && <RoomPage roomSelect={roomSelect} />}
               </Grid>
             </Grid>
           )}
@@ -121,8 +133,28 @@ const App = () => {
   );
 };
 
+const CopyToClipBoard = ({ roomSelect }) => {
+  const { enqueueSnackbar } = useSnackbar();
+
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(roomSelect);
+    enqueueSnackbar("Room ID has been copied to clipboard.", {
+      variant: "info",
+    });
+  };
+  return roomSelect ? (
+    <Tooltip title="Copy chat id">
+      <IconButton onClick={handleCopyToClipboard}>
+        <FileCopy />
+      </IconButton>
+    </Tooltip>
+  ) : null;
+};
+
 const CreateRoomForm = () => {
   const classes = useStyles();
+
+  const { enqueueSnackbar } = useSnackbar();
 
   const [formValue, setFormValue] = useState("");
   const roomsRef = firestore.collection("rooms");
@@ -138,7 +170,10 @@ const CreateRoomForm = () => {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     setFormValue("");
-    if (room) alert("Room created!");
+    if (room)
+      enqueueSnackbar("Room created!", {
+        variant: "success",
+      });
   };
 
   return (
@@ -151,11 +186,12 @@ const CreateRoomForm = () => {
           value={formValue}
           onChange={(e) => setFormValue(e.target.value)}
           placeholder="Enter room name..."
+          color="secondary"
         />
         <Button
           size="small"
           variant="text"
-          color="primary"
+          color="secondary"
           type="submit"
           disabled={!formValue}
         >
@@ -167,6 +203,8 @@ const CreateRoomForm = () => {
 };
 
 const InviteFormMessage = ({ roomsRef, roomId }) => {
+  const { enqueueSnackbar } = useSnackbar();
+
   const [roomDoc, loading] = useDocumentData(roomsRef.doc(roomId));
 
   const { uid } = auth.currentUser;
@@ -175,13 +213,14 @@ const InviteFormMessage = ({ roomsRef, roomId }) => {
     roomsRef.doc(roomId).update({
       members: firebase.firestore.FieldValue.arrayUnion(uid),
     });
+    enqueueSnackbar(`Room added with name: ${roomDoc.name}. added.`, {
+      variant: "success",
+    });
+  } else {
+    !loading && enqueueSnackbar(`No room found.`, { variant: "error" });
   }
 
-  return loading
-    ? "Loading room..."
-    : roomDoc
-    ? `Room ${roomDoc.name} added please select the room from dropdown below`
-    : "No room found";
+  return loading && "Loading room...";
 };
 
 const InviteForm = () => {
@@ -202,12 +241,13 @@ const InviteForm = () => {
         <Input
           value={formValue}
           onChange={(e) => setFormValue(e.target.value)}
+          color="secondary"
           placeholder="Enter the room id..."
         />
         <Button
           size="small"
           variant="text"
-          color="primary"
+          color="secondary"
           type="submit"
           disabled={!formValue}
         >
@@ -221,10 +261,7 @@ const InviteForm = () => {
   );
 };
 
-const RoomPage = () => {
-  const classes = useStyles();
-
-  const [roomSelect, setRoomSelect] = useState("");
+const SelectRoom = ({ roomSelect, setRoomSelect }) => {
   const { uid } = auth.currentUser;
 
   const roomsRef = firestore.collection("rooms");
@@ -236,36 +273,30 @@ const RoomPage = () => {
     setRoomSelect(e.target.value);
   };
 
-  return (
-    <>
-      {rooms && (
-        <Paper square className={classes.paper}>
-          <Typography variant="h6" color="textPrimary">
-            View Room
-          </Typography>
-          <FormControl>
-            <Select
-              displayEmpty
-              fullWidth
-              onChange={handleChange}
-              value={roomSelect}
-            >
-              <MenuItem disabled value="">
-                Select a room
-              </MenuItem>
-              {rooms.map((room) => (
-                <MenuItem value={room.id} key={room.id}>
-                  {room.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Paper>
-      )}
+  return rooms ? (
+    <FormControl>
+      <Select
+        displayEmpty
+        onChange={handleChange}
+        value={roomSelect}
+        color="secondary"
+        autoWidth
+      >
+        <MenuItem disabled value="">
+          Select a room
+        </MenuItem>
+        {rooms.map((room) => (
+          <MenuItem value={room.id} key={room.id}>
+            {room.name}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  ) : null;
+};
 
-      {roomSelect && <ListPage roomId={roomSelect} />}
-    </>
-  );
+const RoomPage = ({ roomSelect }) => {
+  return roomSelect ? <ListPage roomId={roomSelect} /> : null;
 };
 
 const ListPage = ({ roomId }) => {
@@ -304,24 +335,18 @@ const ListPage = ({ roomId }) => {
   };
   return (
     <>
-      <Button
-        size="small"
-        variant="text"
-        color="secondary"
-        onClick={() => navigator.clipboard.writeText(roomId)}
-      >
-        Copy room id
-      </Button>
       <form onSubmit={handleSubmit}>
         <Input
           value={formValue}
           onChange={(e) => setFormValue(e.target.value)}
+          color="secondary"
+          fullWidth
           placeholder="Enter an item..."
         />
         <Button
           size="small"
           variant="text"
-          color="primary"
+          color="secondary"
           type="submit"
           disabled={!formValue}
         >
@@ -329,14 +354,27 @@ const ListPage = ({ roomId }) => {
         </Button>
       </form>
       {loading ? (
-        "Loading..."
+        <CircularProgress color="secondary" />
       ) : (
-        <List>
-          {items &&
-            items.map((item) => (
-              <Item itemsRef={itemsRef} item={item} key={item.id} />
-            ))}
-        </List>
+        <>
+          <List>
+            {items &&
+              items
+                .filter((item) => !item.checked)
+                .map((item) => (
+                  <Item itemsRef={itemsRef} item={item} key={item.id} />
+                ))}
+          </List>
+          <Divider />
+          <List>
+            {items &&
+              items
+                .filter((item) => item.checked)
+                .map((item) => (
+                  <Item itemsRef={itemsRef} item={item} key={item.id} />
+                ))}
+          </List>
+        </>
       )}
     </>
   );
@@ -363,33 +401,36 @@ const Item = (props) => {
   };
 
   return (
-    <ListItem>
-      <ListItemIcon>
-        <Checkbox
-          edge="start"
-          checked={checked}
-          onChange={handleChange}
-          tabIndex={-1}
-          disableRipple
-          inputProps={{ "aria-label": "checkbox" }}
+    <>
+      <ListItem>
+        <ListItemIcon>
+          <Checkbox
+            edge="start"
+            checked={checked}
+            onChange={handleChange}
+            tabIndex={-1}
+            disableRipple
+            inputProps={{ "aria-label": "checkbox" }}
+            color="default"
+          />
+        </ListItemIcon>
+        <ListItemText
+          primary={item}
+          secondary={
+            displayName
+              ? `Added by: ${displayName}`
+              : checked
+              ? "Done"
+              : "In Progress"
+          }
         />
-      </ListItemIcon>
-      <ListItemText
-        primary={item}
-        secondary={
-          displayName
-            ? `Added by: ${displayName}`
-            : checked
-            ? "Done"
-            : "In Progress"
-        }
-      />
-      <ListItemSecondaryAction>
-        <IconButton edge="end" aria-label="delete" onClick={handleDelete}>
-          <Delete />
-        </IconButton>
-      </ListItemSecondaryAction>
-    </ListItem>
+        <ListItemSecondaryAction>
+          <IconButton edge="end" aria-label="delete" onClick={handleDelete}>
+            <Delete />
+          </IconButton>
+        </ListItemSecondaryAction>
+      </ListItem>
+    </>
   );
 };
 
@@ -411,9 +452,11 @@ const SignIn = () => {
 const SignOut = () => {
   return (
     auth.currentUser && (
-      <Button color="inherit" onClick={() => auth.signOut()}>
-        Sign Out
-      </Button>
+      <Tooltip title="Sign out">
+        <IconButton color="inherit" onClick={() => auth.signOut()}>
+          <ExitToApp />
+        </IconButton>
+      </Tooltip>
     )
   );
 };

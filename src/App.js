@@ -144,7 +144,7 @@ const CopyToClipBoard = ({ roomSelect }) => {
   };
   return roomSelect ? (
     <Tooltip title="Copy chat id">
-      <IconButton onClick={handleCopyToClipboard}>
+      <IconButton size="small" onClick={handleCopyToClipboard}>
         <FileCopy />
       </IconButton>
     </Tooltip>
@@ -453,7 +453,7 @@ const SignOut = () => {
   return (
     auth.currentUser && (
       <Tooltip title="Sign out">
-        <IconButton color="inherit" onClick={() => auth.signOut()}>
+        <IconButton size="small" color="inherit" onClick={() => auth.signOut()}>
           <ExitToApp />
         </IconButton>
       </Tooltip>

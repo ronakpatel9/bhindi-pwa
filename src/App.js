@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 import {
   List,
@@ -8,6 +8,18 @@ import {
   IconButton,
   ListItemIcon,
   Checkbox,
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  makeStyles,
+  CircularProgress,
+  Grid,
+  FormControl,
+  Select,
+  Input,
+  Paper,
+  MenuItem,
 } from "@material-ui/core";
 import { Delete } from "@material-ui/icons";
 
@@ -51,7 +63,21 @@ firestore.enablePersistence().catch((err) => {
   }
 });
 
+const useStyles = makeStyles((theme) => ({
+  root: {},
+  loginButton: {
+    marginRight: theme.spacing(2),
+  },
+  title: {
+    flexGrow: 1,
+  },
+  paper: {
+    padding: "5px",
+  },
+}));
+
 const App = () => {
+  const classes = useStyles();
   const [user, loading] = useAuthState(auth);
 
   if (user) {
@@ -60,22 +86,44 @@ const App = () => {
 
   return (
     <div>
-      <header>
-        <h1>Bhindi</h1>
-        {loading && "Loading..."}
-        {user ? <SignOut /> : <SignIn />}
-        {user && (
-          <>
-            <InviteForm /> <CreateRoomForm />
-          </>
-        )}
-      </header>
-      <section>{user && <RoomPage />}</section>
+      {loading ? (
+        <Grid container justify="center" alignItems="center" direction="column">
+          <Grid item>
+            <CircularProgress />
+          </Grid>
+        </Grid>
+      ) : (
+        <>
+          <AppBar position="static">
+            <Toolbar>
+              <Typography variant="h5" className={classes.title}>
+                Bhindi
+              </Typography>
+              {user ? <SignOut /> : <SignIn />}
+            </Toolbar>
+          </AppBar>
+          {user && (
+            <Grid container spacing={1} align="center" justify="center">
+              <Grid item sm={6} xs={12}>
+                <InviteForm />
+              </Grid>
+              <Grid item sm={6} xs={12}>
+                <CreateRoomForm />
+              </Grid>
+              <Grid item xs={12}>
+                {user && <RoomPage />}
+              </Grid>
+            </Grid>
+          )}
+        </>
+      )}
     </div>
   );
 };
 
 const CreateRoomForm = () => {
+  const classes = useStyles();
+
   const [formValue, setFormValue] = useState("");
   const roomsRef = firestore.collection("rooms");
 
@@ -94,16 +142,27 @@ const CreateRoomForm = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        value={formValue}
-        onChange={(e) => setFormValue(e.target.value)}
-        placeholder="Enter room name..."
-      />
-      <button type="submit" disabled={!formValue}>
-        Create room
-      </button>
-    </form>
+    <Paper square className={classes.paper}>
+      <Typography variant="h6" color="textPrimary">
+        New Room
+      </Typography>
+      <form onSubmit={handleSubmit}>
+        <Input
+          value={formValue}
+          onChange={(e) => setFormValue(e.target.value)}
+          placeholder="Enter room name..."
+        />
+        <Button
+          size="small"
+          variant="text"
+          color="primary"
+          type="submit"
+          disabled={!formValue}
+        >
+          Create room
+        </Button>
+      </form>
+    </Paper>
   );
 };
 
@@ -126,6 +185,7 @@ const InviteFormMessage = ({ roomsRef, roomId }) => {
 };
 
 const InviteForm = () => {
+  const classes = useStyles();
   const [formValue, setFormValue] = useState("");
   const [addRoomId, setAddRoomId] = useState(false);
   const roomsRef = firestore.collection("rooms");
@@ -136,33 +196,41 @@ const InviteForm = () => {
   };
 
   return (
-    <>
-      <h3>Invite Form</h3>
+    <Paper square className={classes.paper}>
+      <Typography variant="h6">Invite</Typography>
       <form onSubmit={addRoom}>
-        <input
+        <Input
           value={formValue}
           onChange={(e) => setFormValue(e.target.value)}
-          placeholder="Enter the chat id..."
+          placeholder="Enter the room id..."
         />
-        <button type="submit" disabled={!formValue}>
+        <Button
+          size="small"
+          variant="text"
+          color="primary"
+          type="submit"
+          disabled={!formValue}
+        >
           Add room
-        </button>
+        </Button>
       </form>
       {addRoomId && formValue && (
         <InviteFormMessage roomsRef={roomsRef} roomId={formValue} />
       )}
-    </>
+    </Paper>
   );
 };
 
 const RoomPage = () => {
+  const classes = useStyles();
+
   const [roomSelect, setRoomSelect] = useState("");
   const { uid } = auth.currentUser;
 
   const roomsRef = firestore.collection("rooms");
 
   const query = roomsRef.where("members", "array-contains", uid);
-  const [rooms, loading] = useCollectionData(query, { idField: "id" });
+  const [rooms] = useCollectionData(query, { idField: "id" });
 
   const handleChange = (e) => {
     setRoomSelect(e.target.value);
@@ -170,20 +238,31 @@ const RoomPage = () => {
 
   return (
     <>
-      {loading ? (
-        "Loading..."
-      ) : (
-        <select defaultValue="" onChange={handleChange}>
-          <option disabled value="">
-            Select an option
-          </option>
-          {rooms.map((room) => (
-            <option value={room.id} key={room.id}>
-              {room.name}
-            </option>
-          ))}
-        </select>
+      {rooms && (
+        <Paper square className={classes.paper}>
+          <Typography variant="h6" color="textPrimary">
+            View Room
+          </Typography>
+          <FormControl>
+            <Select
+              displayEmpty
+              fullWidth
+              onChange={handleChange}
+              value={roomSelect}
+            >
+              <MenuItem disabled value="">
+                Select a room
+              </MenuItem>
+              {rooms.map((room) => (
+                <MenuItem value={room.id} key={room.id}>
+                  {room.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Paper>
       )}
+
       {roomSelect && <ListPage roomId={roomSelect} />}
     </>
   );
@@ -225,16 +304,29 @@ const ListPage = ({ roomId }) => {
   };
   return (
     <>
-      <h4>Current room id: {roomId}</h4>
+      <Button
+        size="small"
+        variant="text"
+        color="secondary"
+        onClick={() => navigator.clipboard.writeText(roomId)}
+      >
+        Copy room id
+      </Button>
       <form onSubmit={handleSubmit}>
-        <input
+        <Input
           value={formValue}
           onChange={(e) => setFormValue(e.target.value)}
           placeholder="Enter an item..."
         />
-        <button type="submit" disabled={!formValue}>
+        <Button
+          size="small"
+          variant="text"
+          color="primary"
+          type="submit"
+          disabled={!formValue}
+        >
           Add item
-        </button>
+        </Button>
       </form>
       {loading ? (
         "Loading..."
@@ -309,14 +401,20 @@ const SignIn = () => {
 
   return (
     <>
-      <button onClick={signInWithGoogle}>Sign in with Google</button>
+      <Button color="inherit" onClick={signInWithGoogle}>
+        Sign in with Google
+      </Button>
     </>
   );
 };
 
 const SignOut = () => {
   return (
-    auth.currentUser && <button onClick={() => auth.signOut()}>Sign Out</button>
+    auth.currentUser && (
+      <Button color="inherit" onClick={() => auth.signOut()}>
+        Sign Out
+      </Button>
+    )
   );
 };
 

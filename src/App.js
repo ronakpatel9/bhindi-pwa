@@ -26,13 +26,13 @@ import { SelectRoom } from "./components/selectRoom";
 import { RoomPage } from "./components/roomPage";
 
 firebase.initializeApp({
-  apiKey: "AIzaSyAaxBxClGHAVHAMZXzZFwR10QLuVubesVU",
-  authDomain: "bhindi-82dec.firebaseapp.com",
-  projectId: "bhindi-82dec",
-  storageBucket: "bhindi-82dec.appspot.com",
-  messagingSenderId: "763195742769",
-  appId: "1:763195742769:web:8bde9a8c4626e6f0e25310",
-  measurementId: "G-RMNSW7C04M",
+  apiKey: process.env.REACT_APP_API_KEY,
+  authDomain: process.env.REACT_APP_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_APP_ID,
+  measurementId: process.env.REACT_APP_MEASUREMENT_ID,
 });
 
 const auth = firebase.auth();
